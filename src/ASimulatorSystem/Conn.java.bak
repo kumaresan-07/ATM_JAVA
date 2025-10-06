@@ -1,0 +1,155 @@
+package ASimulatorSystem;
+
+import java.sql.*;
+import javax.swing.JOptionPane;
+
+public class Conn {
+    Connection c;
+    Statement s;
+    
+    public Conn() throws SQLException {
+        try {
+            System.out.println("Loading MySQL JDBC driver...");
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            System.out.println("Driver loaded successfully");
+            
+            // First connect without database
+            String baseUrl = "jdbc:mysql://localhost:3306?allowPublicKeyRetrieval=true&useSSL=false";
+            String username = "root";
+            String password = "";
+            
+            System.out.println("Connecting to MySQL...");
+            c = DriverManager.getConnection(baseUrl, username, password);
+            s = c.createStatement();
+            
+            // Create and select database
+            s.executeUpdate("CREATE DATABASE IF NOT EXISTS bankmanagementsystem");
+            s.executeUpdate("USE bankmanagementsystem");
+            System.out.println("Database selected successfully");
+            
+            initializeTables();
+            System.out.println("Database tables initialized successfully");
+            
+        } catch (ClassNotFoundException e) {
+            String error = "Error: MySQL JDBC driver not found\n" + e.getMessage();
+            System.out.println(error);
+            JOptionPane.showMessageDialog(null, error);
+            throw new SQLException(error);
+        } catch (SQLException e) {
+            String error = "Database Error: " + e.getMessage();
+            System.out.println(error);
+            JOptionPane.showMessageDialog(null, error);
+            throw e;
+        }
+    }
+    
+    private void initializeTables() throws SQLException {
+        System.out.println("Creating/verifying database tables...");
+        
+        // Create signup table
+        String signup = "CREATE TABLE IF NOT EXISTS signup (" +
+            "formno varchar(20), " +
+            "name varchar(20), " +
+            "fname varchar(20), " +
+            "dob varchar(20), " +
+            "gender varchar(20), " +
+            "email varchar(30), " +
+            "marital varchar(20), " +
+            "address varchar(40), " +
+            "city varchar(25), " +
+            "pincode varchar(20), " +
+            "state varchar(25))";
+        s.executeUpdate(signup);
+        System.out.println("Signup table verified");
+        
+        // Create signup2 table
+        String signup2 = "CREATE TABLE IF NOT EXISTS signup2 (" +
+            "formno varchar(20), " +
+            "religion varchar(20), " +
+            "category varchar(20), " +
+            "income varchar(20), " +
+            "education varchar(20), " +
+            "occupation varchar(20), " +
+            "pan varchar(20), " +
+            "aadhar varchar(20), " +
+            "seniorcitizen varchar(20), " +
+            "existingaccount varchar(20))";
+        s.executeUpdate(signup2);
+        System.out.println("Signup2 table verified");
+        
+        // Create signup3 table
+        String signup3 = "CREATE TABLE IF NOT EXISTS signup3 (" +
+            "formno varchar(20), " +
+            "accountType varchar(40), " +
+            "cardnumber varchar(16), " +
+            "pin varchar(4), " +
+            "facility varchar(200))";
+        s.executeUpdate(signup3);
+        System.out.println("Signup3 table verified");
+        
+        // Create login table
+        String login = "CREATE TABLE IF NOT EXISTS login (" +
+            "formno varchar(20), " +
+            "cardnumber varchar(16), " +
+            "pin varchar(4))";
+        s.executeUpdate(login);
+        System.out.println("Login table verified");
+        
+        // Create bank table
+        String bank = "CREATE TABLE IF NOT EXISTS bank (" +
+            "pin varchar(4), " +
+            "date varchar(50), " +
+            "type varchar(20), " +
+            "amount varchar(20))";
+        s.executeUpdate(bank);
+        System.out.println("Bank table verified");
+    }
+} +
+                "email varchar(30), " +
+                "marital varchar(20), " +
+                "address varchar(40), " +
+                "city varchar(25), " +
+                "pincode varchar(20), " +
+                "state varchar(25)" +
+            ")",
+            
+            "CREATE TABLE IF NOT EXISTS signup2 (" +
+                "formno varchar(20), " +
+                "religion varchar(20), " +
+                "category varchar(20), " +
+                "income varchar(20), " +
+                "education varchar(20), " +
+                "occupation varchar(20), " +
+                "pan varchar(20), " +
+                "aadhar varchar(20), " +
+                "seniorcitizen varchar(20), " +
+                "existingaccount varchar(20)" +
+            ")",
+            
+            "CREATE TABLE IF NOT EXISTS signup3 (" +
+                "formno varchar(20), " +
+                "accountType varchar(40), " +
+                "cardnumber varchar(25), " +
+                "pin varchar(10), " +
+                "facility varchar(100)" +
+            ")",
+            
+            "CREATE TABLE IF NOT EXISTS login (" +
+                "formno varchar(20), " +
+                "cardnumber varchar(25), " +
+                "pin varchar(10)" +
+            ")",
+            
+            "CREATE TABLE IF NOT EXISTS bank (" +
+                "pin varchar(10), " +
+                "date varchar(50), " +
+                "type varchar(20), " +
+                "amount varchar(20)" +
+            ")"
+        };
+        
+        for (String query : tableQueries) {
+            s.executeUpdate(query);
+        }
+    }
+}
