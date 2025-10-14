@@ -290,20 +290,21 @@ public class Signup3 extends JFrame implements ActionListener{
                         "cardnumber varchar(16), " +
                         "pin varchar(4))");
 
-                    // Now insert the data using regular SQL statements
-                    String insertSignup3 = "insert into signup3 values('"+formno+"','"+atype+"','"+cardno+"','"+pin+"','"+facility+"')";  
-                    String insertLogin = "insert into login values('"+formno+"','"+cardno+"','"+pin+"')";
-                    c1.s.executeUpdate(insertSignup3);
-                    c1.s.executeUpdate(insertLogin);
-                    
+                    // Insert the account data into database
                     String q1 = "insert into signup3 values('"+formno+"','"+atype+"','"+cardno+"','"+pin+"','"+facility+"')";  
                     String q2 = "insert into login values('"+formno+"','"+cardno+"','"+pin+"')";
                     
                     try {
                         c1.s.executeUpdate(q1);
                         c1.s.executeUpdate(q2);
-                        JOptionPane.showMessageDialog(null, "Card Number: " + cardno + "\n Pin:"+ pin);
                         
+                        System.out.println("Account created successfully!");
+                        System.out.println("Card Number: " + cardno);
+                        System.out.println("PIN: " + pin);
+                        
+                        JOptionPane.showMessageDialog(null, "Card Number: " + cardno + "\nPin: "+ pin);
+                        
+                        // Open the Deposit window after successful account creation
                         new Deposit(pin).setVisible(true);
                         setVisible(false);
                     } catch (SQLException ex) {

@@ -73,10 +73,17 @@ public class Withdrawl extends JFrame implements ActionListener{
                 }else{
                     Conn c1 = new Conn();
                     
+                    // Create bank table if it doesn't exist
+                    c1.s.executeUpdate("CREATE TABLE IF NOT EXISTS bank (" +
+                        "pin varchar(10), " +
+                        "date varchar(50), " +
+                        "type varchar(20), " +
+                        "amount varchar(20))");
+                    
                     ResultSet rs = c1.s.executeQuery("select * from bank where pin = '"+pin+"'");
                     int balance = 0;
                     while(rs.next()){
-                       if(rs.getString("mode").equals("Deposit")){
+                       if(rs.getString("type").equals("Deposit")){
                            balance += Integer.parseInt(rs.getString("amount"));
                        }else{
                            balance -= Integer.parseInt(rs.getString("amount"));

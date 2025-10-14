@@ -79,10 +79,18 @@ public class FastCash extends JFrame implements ActionListener {
         try {
             String amount = ((JButton)ae.getSource()).getText().substring(3); //k
             Conn c = new Conn();
+            
+            // Create bank table if it doesn't exist
+            c.s.executeUpdate("CREATE TABLE IF NOT EXISTS bank (" +
+                "pin varchar(10), " +
+                "date varchar(50), " +
+                "type varchar(20), " +
+                "amount varchar(20))");
+            
             ResultSet rs = c.s.executeQuery("select * from bank where pin = '"+pin+"'");
             int balance = 0;
             while (rs.next()) {
-                if (rs.getString("mode").equals("Deposit")) {
+                if (rs.getString("type").equals("Deposit")) {
                     balance += Integer.parseInt(rs.getString("amount"));
                 } else {
                     balance -= Integer.parseInt(rs.getString("amount"));

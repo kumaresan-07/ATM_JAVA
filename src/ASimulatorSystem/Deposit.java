@@ -63,7 +63,18 @@ public class Deposit extends JFrame implements ActionListener{
                     JOptionPane.showMessageDialog(null, "Please enter the Amount to you want to Deposit");
                 }else{
                     Conn c1 = new Conn();
+                    
+                    // Create bank table if it doesn't exist
+                    c1.s.executeUpdate("CREATE TABLE IF NOT EXISTS bank (" +
+                        "pin varchar(10), " +
+                        "date varchar(50), " +
+                        "type varchar(20), " +
+                        "amount varchar(20))");
+                    
+                    // Insert the deposit transaction
                     c1.s.executeUpdate("insert into bank values('"+pin+"', '"+date+"', 'Deposit', '"+amount+"')");
+                    
+                    System.out.println("Deposit successful - PIN: " + pin + ", Amount: " + amount);
                     JOptionPane.showMessageDialog(null, "Rs. "+amount+" Deposited Successfully");
                     setVisible(false);
                     new Transactions(pin).setVisible(true);
