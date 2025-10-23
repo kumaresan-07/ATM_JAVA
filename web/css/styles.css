@@ -204,6 +204,105 @@ body {
     padding: 30px;
 }
 
+/* Hero visual and floating cards */
+.hero-visual {
+    margin-top: 12px;
+    position: relative;
+    height: 120px;
+}
+
+.bank-building {
+    width: 220px;
+    height: 120px;
+    display: block;
+    margin: 0 auto;
+    filter: drop-shadow(0 10px 20px rgba(0,0,0,0.45));
+    transform-origin: center bottom;
+    animation: floatSmall 6s ease-in-out infinite;
+}
+
+@keyframes floatSmall {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.floating-cards { 
+    position: absolute;
+    right: 6%;
+    top: 8px;
+    display: flex;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.floating-card {
+    background: linear-gradient(135deg, rgba(74,144,226,0.15), rgba(147,51,234,0.12));
+    color: var(--text-primary);
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.03);
+    font-weight: 700;
+    font-size: 13px;
+    line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    transform: translateY(0) rotate(-6deg);
+    box-shadow: 0 8px 24px rgba(12,18,25,0.5);
+    animation: floatCard 5s ease-in-out infinite;
+}
+
+.floating-card.small { font-size: 12px; padding: 8px 10px; transform: rotate(4deg); }
+
+.floating-card span { font-weight: 600; font-size: 12px; color: rgba(255,255,255,0.85); }
+
+@keyframes floatCard {
+    0% { transform: translateY(0) rotate(-6deg); opacity: 0.95 }
+    50% { transform: translateY(-12px) rotate(2deg); opacity: 1 }
+    100% { transform: translateY(0) rotate(-6deg); opacity: 0.95 }
+}
+
+/* Enhance input focus underline */
+.form-control, .form-input {
+    background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+    border-left: 4px solid transparent;
+}
+
+.form-control:focus, .form-input:focus {
+    border-left-color: var(--primary-color);
+    box-shadow: 0 6px 30px rgba(74,144,226,0.08);
+}
+
+/* Soft shimmer on title */
+.title { position: relative; }
+.title::after {
+    content: '';
+    position: absolute;
+    left: -40%;
+    top: 0;
+    width: 30%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255,255,255,0.06), rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+    transform: skewX(-20deg);
+    animation: shimmer 3s linear infinite;
+    pointer-events: none;
+}
+@keyframes shimmer { from { left: -40%; } to { left: 120%; } }
+
+/* Vault pulse behind balance */
+.balance-display { position: relative; overflow: visible; }
+.balance-display::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 260px; height: 260px; transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(74,144,226,0.06), transparent 40%);
+    border-radius: 50%;
+    z-index: -1; opacity: 0.9;
+    animation: vaultPulse 3s ease-out infinite;
+}
+@keyframes vaultPulse { 0% { transform: translate(-50%,-50%) scale(0.85); opacity: 0.6 } 70% { transform: translate(-50%,-50%) scale(1.05); opacity: 0.2 } 100% { transform: translate(-50%,-50%) scale(0.85); opacity: 0.6 } }
+
 /* Form Elements */
 .form-group {
     margin-bottom: 20px;
@@ -731,5 +830,35 @@ select.form-input option {
     .checkbox-group {
         grid-template-columns: 1fr;
     }
+}
+
+/* Face Widget Styles */
+.face-widget .face-card { max-width: 900px; }
+.face-controls { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.camera-area { width: 360px; max-width: 100%; background: #0b1220; border: 1px solid var(--border-color); border-radius: 12px; padding: 8px; display:flex; align-items:center; justify-content:center; }
+video#video { width: 100%; height: auto; border-radius: 8px; background: #000; }
+#previewImg { width: 320px; max-width: 100%; border-radius: 8px; border: 1px solid var(--border-color); background: #071020; padding: 6px; }
+.preview-area { margin-top: 10px; }
+.result-area pre { max-height: 280px; overflow: auto; background: #071018; border: 1px solid var(--border-color); padding: 12px; border-radius: 8px; color: var(--text-primary); }
+.file-upload input { cursor: pointer; }
+
+@media (max-width: 720px) {
+    .face-controls { flex-direction: column; }
+    .preview-area { margin-top: 16px; }
+}
+
+/* Dev banner */
+.dev-banner {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: linear-gradient(90deg, #FFB74D, #FF7043);
+    color: #111;
+    padding: 10px 18px;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    z-index: 9999;
+    font-weight: 700;
 }
 

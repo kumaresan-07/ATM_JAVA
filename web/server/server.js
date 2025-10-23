@@ -6,6 +6,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const axios = require('axios');
 
 // Middleware
 app.use(cors());
@@ -513,8 +514,17 @@ app.get('/api/generate-form-number', async (req, res) => {
             if (devMode) {
                 exists = inMemory.signup.some(s => s.formno === formNumber);
             } else {
-                const [rows] = await pool.query('SELECT formno FROM signup WHERE formno = ?', [formNumber]);
-                exists = rows.length > 0;
+                try {
+                    const [rows] = await pool.query('SELECT formno FROM signup WHERE formno = ?', [formNumber]);
+                    exists = rows.length > 0;
+                } catch (qerr) {
+                    // If DB check fails here, fallback to devMode so the frontend can continue working
+                    console.error('DB check failed during form number generation:', qerr.message || qerr);
+                    console.warn('Falling back to DEV mode for form number generation.');
+                    devMode = true;
+                    initInMemoryStores();
+                    exists = inMemory.signup.some(s => s.formno === formNumber);
+                }
             }
         }
 
@@ -566,6 +576,16 @@ app.get('/api/generate-card-number', async (req, res) => {
     }
 });
 
+// 12. SERVER STATUS
+app.get('/api/status', async (req, res) => {
+    try {
+        const dbStatus = devMode ? 'dev' : 'connected';
+        return res.json({ success: true, devMode: devMode, dbStatus: dbStatus });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: 'Unable to read status' });
+    }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ 
@@ -574,6 +594,40 @@ app.get('/api/health', (req, res) => {
         timestamp: new Date().toISOString()
     });
 });
+
+// Face++ detect proxy endpoint
+app.post('/api/face/detect', async (req, res) => {
+    const { image_url, image_base64 } = req.body;
+
+    if (!process.env.FACEPP_API_KEY || !process.env.FACEPP_API_SECRET) {
+        return res.status(500).json({ success: false, message: 'Face++ API keys not configured on server.' });
+    }
+
+    if (!image_url && !image_base64) {
+        return res.status(400).json({ success: false, message: 'Provide image_url or image_base64 in request body.' });
+    }
+
+    try {
+        const form = new URLSearchParams();
+        form.append('api_key', process.env.FACEPP_API_KEY);
+        form.append('api_secret', process.env.FACEPP_API_SECRET);
+        if (image_url) form.append('image_url', image_url);
+        if (image_base64) form.append('image_base64', image_base64);
+
+        // call Face++ detect API
+        const resp = await axios.post('https://api-us.faceplusplus.com/facepp/v3/detect', form.toString(), {
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            timeout: 15000
+        });
+
+        return res.json({ success: true, data: resp.data });
+    } catch (err) {
+        console.error('Face detect error:', err?.response?.data || err.message || err);
+        return res.status(500).json({ success: false, message: 'Face detection failed', error: err?.response?.data || err.message });
+    }
+});
+
+    
 
 // Serve static files (optional - for production)
 app.use(express.static('../'));

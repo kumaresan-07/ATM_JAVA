@@ -39,7 +39,7 @@ async function apiRequest(endpoint, method = 'GET', data = null) {
 // Page Navigation
 function showPage(pageId) {
     const pages = ['loginPage', 'transactionsPage', 'depositPage', 'withdrawPage', 'balancePage', 
-                   'signupPage1', 'signupPage2', 'signupPage3'];
+                   'signupPage1', 'signupPage2', 'signupPage3', 'faceWidget'];
     pages.forEach(page => {
         const element = document.getElementById(page);
         if (element) {
@@ -59,6 +59,31 @@ function showPage(pageId) {
             targetPage.classList.remove('hidden');
         }
     }
+}
+
+// Show the Face Recognition widget and hide other pages
+function showFaceWidget() {
+    // Hide all known pages
+    const pages = ['loginPage', 'transactionsPage', 'depositPage', 'withdrawPage', 'balancePage', 
+                   'signupPage1', 'signupPage2', 'signupPage3'];
+    pages.forEach(p => {
+        const el = document.getElementById(p);
+        if (el) el.classList.add('hidden');
+    });
+
+    // Stop camera on other widgets if any
+    try { stopCamera(); } catch (e) { /* ignore */ }
+
+    const fw = document.getElementById('faceWidget');
+    if (fw) fw.classList.remove('hidden');
+
+    // Ensure UI controls are in the correct state
+    startCameraBtn.disabled = false;
+    stopCameraBtn.disabled = true;
+    captureBtn.disabled = true;
+
+    // Focus the start button for accessibility
+    setTimeout(() => startCameraBtn?.focus(), 150);
 }
 
 // ==================== LOGIN ====================
@@ -634,3 +659,182 @@ document.addEventListener('DOMContentLoaded', () => {
 
 console.log('🏦 NexusBank ATM System Loaded (Connected to Database)');
 console.log('Server URL:', API_URL);
+
+// ==================== FACE++ CLIENT WIRING ====================
+// Elements
+const videoEl = document.getElementById('video');
+const canvasEl = document.getElementById('captureCanvas');
+const previewImg = document.getElementById('previewImg');
+const faceResultEl = document.getElementById('faceResult');
+const startCameraBtn = document.getElementById('startCameraBtn');
+const stopCameraBtn = document.getElementById('stopCameraBtn');
+const captureBtn = document.getElementById('captureBtn');
+const fileInput = document.getElementById('fileInput');
+
+let cameraStream = null;
+
+function showFaceWidget() {
+    showPage(''); // hide others safely
+    document.getElementById('faceWidget').classList.remove('hidden');
+}
+
+function hideFaceWidget() {
+    stopCamera();
+    document.getElementById('faceWidget').classList.add('hidden');
+}
+
+async function startCamera() {
+    faceResultEl.textContent = 'Requesting camera permission...';
+    try {
+        // Pre-check permissions if supported
+        if (navigator.permissions && navigator.permissions.query) {
+            try {
+                const status = await navigator.permissions.query({ name: 'camera' });
+                if (status.state === 'denied') {
+                    faceResultEl.textContent = 'Camera permission blocked. Please allow camera access in your browser settings.';
+                    return;
+                }
+            } catch (permErr) {
+                // Some browsers don't support querying camera permission; ignore and continue
+            }
+        }
+
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+        videoEl.srcObject = cameraStream;
+        startCameraBtn.disabled = true;
+        stopCameraBtn.disabled = false;
+        captureBtn.disabled = false;
+        faceResultEl.textContent = 'Camera ready. Click Capture to take a snapshot.';
+    } catch (err) {
+        console.error('Camera start error', err);
+        // Provide clearer messages based on error
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            faceResultEl.textContent = 'Camera permission denied. Please enable camera access for this site and try again.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            faceResultEl.textContent = 'No camera found. Please attach a camera or use the Upload button.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            faceResultEl.textContent = 'Camera is already in use by another application.';
+        } else {
+            faceResultEl.textContent = 'Unable to access camera. Try using Upload or Test Sample Image.';
+        }
+
+        startCameraBtn.disabled = false;
+        stopCameraBtn.disabled = true;
+        captureBtn.disabled = true;
+    }
+}
+
+function stopCamera() {
+    if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+    }
+    videoEl.srcObject = null;
+    startCameraBtn.disabled = false;
+    stopCameraBtn.disabled = true;
+    captureBtn.disabled = true;
+}
+
+function captureSnapshot() {
+    if (!videoEl || !canvasEl) return;
+    const w = videoEl.videoWidth;
+    const h = videoEl.videoHeight;
+    canvasEl.width = w;
+    canvasEl.height = h;
+    const ctx = canvasEl.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, w, h);
+    const dataUrl = canvasEl.toDataURL('image/jpeg', 0.9);
+    previewImg.src = dataUrl;
+    sendToFaceDetect({ image_base64: dataUrl.split(',')[1] });
+}
+
+function handleFileUpload(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const dataUrl = e.target.result;
+        previewImg.src = dataUrl;
+        sendToFaceDetect({ image_base64: dataUrl.split(',')[1] });
+    };
+    reader.readAsDataURL(file);
+}
+
+async function sendToFaceDetect(payload) {
+    faceResultEl.textContent = 'Detecting...';
+    try {
+        const resp = await fetch(`${API_URL}/face/detect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const json = await resp.json();
+        if (json.success) {
+            faceResultEl.textContent = JSON.stringify(json.data, null, 2);
+        } else {
+            faceResultEl.textContent = `Error: ${json.message || JSON.stringify(json.error)}`;
+        }
+    } catch (err) {
+        console.error('Face detect request failed', err);
+        faceResultEl.textContent = `Request failed: ${err.message}`;
+    }
+}
+
+// Wire buttons when DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    startCameraBtn?.addEventListener('click', startCamera);
+    stopCameraBtn?.addEventListener('click', stopCamera);
+    captureBtn?.addEventListener('click', captureSnapshot);
+    fileInput?.addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) handleFileUpload(file);
+    });
+    // Start polling server status
+    pollServerStatus();
+    setInterval(pollServerStatus, 10000); // every 10s
+});
+
+async function pollServerStatus() {
+    try {
+        const resp = await fetch(`${API_URL}/status`);
+        const json = await resp.json();
+        const banner = document.getElementById('devBanner');
+        if (json && json.devMode) {
+            banner?.classList.remove('hidden');
+            banner.textContent = '⚠️ Server running in DEV MODE (in-memory storage)';
+        } else {
+            banner?.classList.add('hidden');
+        }
+    } catch (err) {
+        // If status endpoint unreachable, show banner to indicate degraded state
+        const banner = document.getElementById('devBanner');
+        banner?.classList.remove('hidden');
+        banner.textContent = '⚠️ Server status unknown (check backend)';
+    }
+
+}
+
+
+
+// Send a reliable public sample face image to the detect endpoint for quick testing
+async function sendSampleImage() {
+    // Public sample image (Obama) hosted in a public GitHub repo - stable for testing
+    const sampleUrl = 'https://raw.githubusercontent.com/ageitgey/face_recognition/master/examples/obama.jpg';
+    previewImg.src = sampleUrl;
+    faceResultEl.textContent = 'Detecting sample image...';
+
+    try {
+        const resp = await fetch(`${API_URL}/face/detect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ image_url: sampleUrl })
+        });
+        const json = await resp.json();
+        if (json.success) {
+            faceResultEl.textContent = JSON.stringify(json.data, null, 2);
+        } else {
+            faceResultEl.textContent = `Error: ${json.message || JSON.stringify(json.error)}`;
+        }
+    } catch (err) {
+        console.error('Sample detect request failed', err);
+        faceResultEl.textContent = `Request failed: ${err.message}`;
+    }
+}
