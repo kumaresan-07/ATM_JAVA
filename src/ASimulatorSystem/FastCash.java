@@ -77,41 +77,70 @@ public class FastCash extends JFrame implements ActionListener {
 
     public void actionPerformed(ActionEvent ae) {
         try {
-            String amount = ((JButton)ae.getSource()).getText().substring(3); //k
-            Conn c = new Conn();
-            
-            // Create bank table if it doesn't exist
-            c.s.executeUpdate("CREATE TABLE IF NOT EXISTS bank (" +
-                "pin varchar(10), " +
-                "date varchar(50), " +
-                "type varchar(20), " +
-                "amount varchar(20))");
-            
-            ResultSet rs = c.s.executeQuery("select * from bank where pin = '"+pin+"'");
-            int balance = 0;
-            while (rs.next()) {
-                if (rs.getString("type").equals("Deposit")) {
-                    balance += Integer.parseInt(rs.getString("amount"));
-                } else {
-                    balance -= Integer.parseInt(rs.getString("amount"));
-                }
-            } String num = "17";
-            if (ae.getSource() != b7 && balance < Integer.parseInt(amount)) {
-                JOptionPane.showMessageDialog(null, "Insuffient Balance");
-                return;
-            }
-
+            // If the BACK button was pressed, go back immediately
             if (ae.getSource() == b7) {
                 this.setVisible(false);
                 new Transactions(pin).setVisible(true);
-            }else{
-                Date date = new Date();
-                c.s.executeUpdate("insert into bank values('"+pin+"', '"+date+"', 'Withdrawl', '"+amount+"')");
-                JOptionPane.showMessageDialog(null, "Rs. "+amount+" Debited Successfully");
-                    
-                setVisible(false);
-                new Transactions(pin).setVisible(true);
+                return;
             }
+
+            // For amount buttons: extract numeric amount safely
+            String label = ((JButton) ae.getSource()).getText();
+            // Remove non-digit characters and trim
+            String amountStr = label.replaceAll("\\D+", "").trim();
+            if (amountStr.isEmpty()) {
+                JOptionPane.showMessageDialog(null, "Invalid amount selected: " + label);
+                return;
+            }
+
+            int amount = 0;
+            try {
+                amount = Integer.parseInt(amountStr);
+            } catch (NumberFormatException nfe) {
+                JOptionPane.showMessageDialog(null, "Unable to parse amount: " + amountStr);
+                return;
+            }
+
+            Conn c = new Conn();
+
+            // Create bank table if it doesn't exist
+            c.s.executeUpdate("CREATE TABLE IF NOT EXISTS bank (" +
+                    "pin varchar(10), " +
+                    "date varchar(50), " +
+                    "type varchar(20), " +
+                    "amount varchar(20))");
+
+            // Calculate current balance for this PIN
+            ResultSet rs = c.s.executeQuery("select * from bank where pin = '" + pin + "'");
+            int balance = 0;
+            while (rs.next()) {
+                String t = rs.getString("type");
+                String a = rs.getString("amount");
+                int val = 0;
+                try {
+                    val = Integer.parseInt(a);
+                } catch (Exception ex) {
+                    // skip malformed amount
+                    continue;
+                }
+                if ("Deposit".equalsIgnoreCase(t)) {
+                    balance += val;
+                } else {
+                    balance -= val;
+                }
+            }
+
+            if (balance < amount) {
+                JOptionPane.showMessageDialog(null, "Insufficient Balance");
+                return;
+            }
+
+            Date date = new Date();
+            c.s.executeUpdate("insert into bank values('" + pin + "', '" + date + "', 'Withdrawl', '" + amount + "')");
+            JOptionPane.showMessageDialog(null, "Rs. " + amount + " Debited Successfully");
+
+            setVisible(false);
+            new Transactions(pin).setVisible(true);
         } catch (Exception e) {
             e.printStackTrace();
         }
