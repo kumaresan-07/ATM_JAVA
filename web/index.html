@@ -460,6 +460,25 @@
                     </label>
                 </div>
                 
+                <!-- Face ID Capture Section -->
+                <div class="form-group">
+                    <label>📸 Capture Face ID (Optional - Recommended for Secure Login):</label>
+                    <div class="face-capture-box">
+                        <video id="signupVideo" width="320" height="240" autoplay playsinline style="border: 2px solid #ddd; border-radius: 8px; display: none;"></video>
+                        <canvas id="signupCanvas" style="display: none;"></canvas>
+                        <img id="signupFacePreview" style="max-width: 320px; border: 2px solid #ddd; border-radius: 8px; display: none;" alt="Face preview">
+                        <div class="button-group" style="margin-top: 10px;">
+                            <button type="button" class="btn btn-primary" id="startSignupCamera" onclick="startSignupCamera()">Start Camera</button>
+                            <button type="button" class="btn btn-secondary" id="captureSignupFace" onclick="captureSignupFace()" disabled>Capture Face</button>
+                            <button type="button" class="btn btn-secondary" id="retakeSignupFace" onclick="retakeSignupFace()" style="display: none;">Retake</button>
+                            <button type="button" class="btn btn-warning" id="skipFaceId" onclick="if(typeof skipFaceId === 'function') { skipFaceId(); } else { alert('Function not loaded'); }">Skip Face ID</button>
+                        </div>
+                        <p id="signupFaceStatus" style="margin-top: 10px; color: #666; font-size: 14px;">
+                            💡 <strong>Note:</strong> Face ID adds extra security to your account. You can skip it and add later.
+                        </p>
+                    </div>
+                </div>
+                
                 <div id="signup3Status" class="status-message" style="display: none;"></div>
                 
                 <div class="button-group">

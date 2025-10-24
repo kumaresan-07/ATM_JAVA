@@ -274,6 +274,212 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ==================== FACE ID CAPTURE FOR SIGNUP ====================
+let signupCameraStream = null;
+let signupFaceData = null;
+
+async function startSignupCamera() {
+    const video = document.getElementById('signupVideo');
+    const statusEl = document.getElementById('signupFaceStatus');
+    const startBtn = document.getElementById('startSignupCamera');
+    const captureBtn = document.getElementById('captureSignupFace');
+    
+    console.log('startSignupCamera called');
+    
+    // Check if browser supports getUserMedia
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        statusEl.textContent = '❌ Your browser does not support camera access';
+        statusEl.style.color = '#dc3545';
+        alert('Camera access is not supported in your browser. Please use Chrome, Firefox, or Edge.');
+        return;
+    }
+    
+    try {
+        statusEl.textContent = 'Requesting camera permission...';
+        statusEl.style.color = '#007bff';
+        
+        signupCameraStream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                facingMode: 'user',
+                width: { ideal: 640 },
+                height: { ideal: 480 }
+            }, 
+            audio: false 
+        });
+        
+        video.srcObject = signupCameraStream;
+        video.style.display = 'block';
+        startBtn.disabled = true;
+        captureBtn.disabled = false;
+        statusEl.textContent = '✓ Camera ready! Position your face in the frame and click Capture Face';
+        statusEl.style.color = '#28a745';
+    } catch (err) {
+        console.error('Camera error:', err);
+        let errorMsg = 'Camera access denied or not available';
+        
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+            errorMsg = '❌ Camera permission denied. Please allow camera access and try again.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+            errorMsg = '❌ No camera found. Please connect a camera and try again.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+            errorMsg = '❌ Camera is being used by another application. Close other apps and try again.';
+        } else if (err.name === 'NotSupportedError') {
+            errorMsg = '❌ Camera access requires HTTPS. Make sure you are accessing via http://localhost:3000';
+        }
+        
+        statusEl.textContent = errorMsg;
+        statusEl.style.color = '#dc3545';
+        alert(errorMsg + '\n\nError: ' + err.name + '\n\nMake sure you:\n1. Access via http://localhost:3000\n2. Allow camera permissions\n3. Camera is not used by other apps');
+    }
+}
+
+function captureSignupFace() {
+    const video = document.getElementById('signupVideo');
+    const canvas = document.getElementById('signupCanvas');
+    const preview = document.getElementById('signupFacePreview');
+    const statusEl = document.getElementById('signupFaceStatus');
+    const captureBtn = document.getElementById('captureSignupFace');
+    const retakeBtn = document.getElementById('retakeSignupFace');
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    
+    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+    preview.src = imageData;
+    preview.style.display = 'block';
+    video.style.display = 'none';
+    
+    // Stop camera
+    if (signupCameraStream) {
+        signupCameraStream.getTracks().forEach(track => track.stop());
+        signupCameraStream = null;
+    }
+    
+    captureBtn.style.display = 'none';
+    retakeBtn.style.display = 'inline-block';
+    statusEl.textContent = 'Verifying face...';
+    statusEl.style.color = '#007bff';
+    
+    // Send to Face++ for verification
+    verifySignupFace(imageData);
+}
+
+async function verifySignupFace(imageData) {
+    const statusEl = document.getElementById('signupFaceStatus');
+    
+    try {
+        const base64Image = imageData.split(',')[1];
+        const result = await apiRequest('/face/detect', 'POST', { image_base64: base64Image });
+        
+        if (result.success && result.data && result.data.faces && result.data.faces.length > 0) {
+            const face = result.data.faces[0];
+            signupFaceData = {
+                image: imageData,
+                token: face.face_token,
+                faceRectangle: face.face_rectangle
+            };
+            statusEl.textContent = '✓ Face captured successfully! You can now submit the form.';
+            statusEl.style.color = '#28a745';
+        } else {
+            statusEl.textContent = '⚠ No face detected. Please retake the photo.';
+            statusEl.style.color = '#ffc107';
+            signupFaceData = null;
+        }
+    } catch (err) {
+        console.error('Face verification error:', err);
+        statusEl.textContent = '✓ Face captured (offline mode). You can now submit the form.';
+        statusEl.style.color = '#28a745';
+        // Store image even if Face++ fails (for offline mode)
+        signupFaceData = { image: imageData, token: null };
+    }
+}
+
+function retakeSignupFace() {
+    const video = document.getElementById('signupVideo');
+    const preview = document.getElementById('signupFacePreview');
+    const startBtn = document.getElementById('startSignupCamera');
+    const captureBtn = document.getElementById('captureSignupFace');
+    const retakeBtn = document.getElementById('retakeSignupFace');
+    const statusEl = document.getElementById('signupFaceStatus');
+    
+    preview.style.display = 'none';
+    retakeBtn.style.display = 'none';
+    startBtn.disabled = false;
+    captureBtn.disabled = true;
+    statusEl.textContent = 'Click Start Camera to capture your face again';
+    statusEl.style.color = '#666';
+    signupFaceData = null;
+}
+
+function skipFaceId() {
+    console.log('skipFaceId function called');
+    
+    const statusEl = document.getElementById('signupFaceStatus');
+    const startBtn = document.getElementById('startSignupCamera');
+    const captureBtn = document.getElementById('captureSignupFace');
+    const retakeBtn = document.getElementById('retakeSignupFace');
+    const skipBtn = document.getElementById('skipFaceId');
+    const preview = document.getElementById('signupFacePreview');
+    const video = document.getElementById('signupVideo');
+    
+    console.log('Elements found:', {
+        statusEl: !!statusEl,
+        startBtn: !!startBtn,
+        captureBtn: !!captureBtn,
+        retakeBtn: !!retakeBtn,
+        skipBtn: !!skipBtn,
+        preview: !!preview,
+        video: !!video
+    });
+    
+    // Stop camera if running
+    if (signupCameraStream) {
+        console.log('Stopping camera stream');
+        signupCameraStream.getTracks().forEach(track => track.stop());
+        signupCameraStream = null;
+    }
+    
+    // Set a placeholder for skipped face
+    signupFaceData = { 
+        image: null, 
+        token: null,
+        skipped: true 
+    };
+    console.log('signupFaceData set to:', signupFaceData);
+    
+    if (video) video.style.display = 'none';
+    if (preview) preview.style.display = 'none';
+    if (startBtn) startBtn.disabled = true;
+    if (captureBtn) captureBtn.disabled = true;
+    if (retakeBtn) retakeBtn.style.display = 'none';
+    if (skipBtn) {
+        skipBtn.disabled = true;
+        skipBtn.textContent = 'Face ID Skipped ✓';
+        skipBtn.classList.remove('btn-warning');
+        skipBtn.classList.add('btn-success');
+    }
+    
+    if (statusEl) {
+        statusEl.innerHTML = '✅ <strong>Face ID skipped.</strong> You can proceed with signup. (Face ID can be added later for enhanced security)';
+        statusEl.style.color = '#28a745';
+    }
+    
+    console.log('skipFaceId function completed successfully');
+}
+
+// Add event listener for Skip Face ID button
+document.addEventListener('DOMContentLoaded', () => {
+    const skipBtn = document.getElementById('skipFaceId');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', function() {
+            console.log('Skip button clicked via event listener');
+            skipFaceId();
+        });
+    }
+});
+
 // Signup Form 3 Handler
 document.addEventListener('DOMContentLoaded', () => {
     const form3 = document.getElementById('signupForm3');
@@ -294,6 +500,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
+            // Check if face is captured or skipped
+            if (!signupFaceData) {
+                showStatus(document.getElementById('signup3Status'), 'Please capture your face ID or click Skip', 'error');
+                document.getElementById('signupFaceStatus').textContent = '⚠ Please either capture Face ID or skip to continue';
+                document.getElementById('signupFaceStatus').style.color = '#dc3545';
+                return;
+            }
+            
             // Get selected services
             const servicesCheckboxes = document.querySelectorAll('input[name="services"]:checked');
             const services = Array.from(servicesCheckboxes).map(cb => cb.value);
@@ -307,7 +521,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 accountType: signupData.page3.accountType,
                 cardNumber: signupData.page3.cardNumber,
                 pin: signupData.page3.pin,
-                services: services
+                services: services,
+                faceToken: signupFaceData.token,
+                faceImage: signupFaceData.image
             };
             
             showStatus(document.getElementById('signup3Status'), 'Creating account...', 'success');
@@ -324,11 +540,13 @@ document.addEventListener('DOMContentLoaded', () => {
                           `Form Number: ${signupData.formNumber}\n` +
                           `Card Number: ${signupData.page3.cardNumber}\n` +
                           `PIN: ${signupData.page3.pin}\n` +
-                          `Account Type: ${signupData.page3.accountType}\n\n` +
+                          `Account Type: ${signupData.page3.accountType}\n` +
+                          `Face ID: Registered ✓\n\n` +
                           `Please save these details for login!`);
                     
                     // Reset signup data
                     signupData = { formNumber: '', page1: {}, page2: {}, page3: {} };
+                    signupFaceData = null;
                     
                     // Clear forms
                     document.getElementById('signupForm1').reset();

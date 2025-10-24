@@ -52,6 +52,8 @@ CREATE TABLE IF NOT EXISTS login (
   formno VARCHAR(20),
   cardnumber VARCHAR(32) UNIQUE,
   pin VARCHAR(10),
+  face_token TEXT,  -- Store Face++ face token for facial recognition
+  face_image TEXT,  -- Store base64 image of user's face
   INDEX (formno)
 );
 

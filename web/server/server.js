@@ -207,11 +207,11 @@ app.post('/api/signup/page2', async (req, res) => {
 
 // 4. SIGNUP - PAGE 3 (Insert into signup3 and login tables)
 app.post('/api/signup/page3', async (req, res) => {
-    const { formNumber, accountType, cardNumber, pin, services } = req.body;
+    const { formNumber, accountType, cardNumber, pin, services, faceToken, faceImage } = req.body;
     try {
         if (devMode) {
             inMemory.signup3.push({ formno: formNumber, accountType, cardnumber: cardNumber, pin, facility: services.join(', ') });
-            inMemory.login.push({ formno: formNumber, cardnumber: cardNumber, pin });
+            inMemory.login.push({ formno: formNumber, cardnumber: cardNumber, pin, face_token: faceToken, face_image: faceImage });
             return res.json({ success: true, message: 'Account created (dev)', credentials: { formNumber, cardNumber, pin } });
         }
 
@@ -225,21 +225,22 @@ app.post('/api/signup/page3', async (req, res) => {
                 [formNumber, accountType, cardNumber, pin, services.join(', ')]
             );
 
-            // Insert into login table
+            // Insert into login table with face data
             await connection.query(
-                'INSERT INTO login (formno, cardnumber, pin) VALUES (?, ?, ?)',
-                [formNumber, cardNumber, pin]
+                'INSERT INTO login (formno, cardnumber, pin, face_token, face_image) VALUES (?, ?, ?, ?, ?)',
+                [formNumber, cardNumber, pin, faceToken, faceImage]
             );
 
             await connection.commit();
 
             res.json({
                 success: true,
-                message: 'Account created successfully!',
+                message: 'Account created successfully with Face ID!',
                 credentials: {
                     formNumber: formNumber,
                     cardNumber: cardNumber,
-                    pin: pin
+                    pin: pin,
+                    faceRegistered: !!faceToken || !!faceImage
                 }
             });
         } catch (error) {
