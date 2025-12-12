@@ -7,6 +7,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const axios = require('axios');
+const MIN_BALANCE = Number(process.env.MIN_BALANCE || 0); // Prevent balances below this threshold
 
 // Middleware
 app.use(cors());
@@ -79,9 +80,10 @@ app.post('/api/login', async (req, res) => {
             if (!row) return res.status(401).json({ success: false, message: 'Invalid card number or PIN' });
             const formno = row.formno;
             const userDetails = inMemory.signup.filter(s => s.formno === formno);
-            const balance = inMemory.bank
+            const rawBalance = inMemory.bank
                 .filter(t => t.pin === pin)
                 .reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
+            const balance = Math.max(0, rawBalance || 0); // Never return negative
 
             return res.json({
                 success: true,
@@ -90,7 +92,7 @@ app.post('/api/login', async (req, res) => {
                     formNumber: formno,
                     cardNumber: cardNumber,
                     pin: pin,
-                    balance: balance || 0,
+                    balance: balance,
                     name: userDetails[0]?.name || '',
                     email: userDetails[0]?.email || ''
                 }
@@ -122,7 +124,8 @@ app.post('/api/login', async (req, res) => {
             [pin]
         );
 
-        const balance = Number(bankData[0].balance) || 0;
+        const rawBalance = Number(bankData[0].balance) || 0;
+        const balance = Math.max(0, rawBalance); // Never return negative
 
         res.json({
             success: true,
@@ -265,8 +268,9 @@ app.get('/api/balance/:pin', async (req, res) => {
 
     try {
         if (devMode) {
-            const balance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
-            return res.json({ success: true, balance: Number(balance) || 0 });
+            const rawBalance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
+            const balance = Math.max(0, Number(rawBalance) || 0); // Never return negative
+            return res.json({ success: true, balance: balance });
         }
 
         const [rows] = await pool.query(
@@ -274,7 +278,8 @@ app.get('/api/balance/:pin', async (req, res) => {
             [pin]
         );
 
-        const balance = parseFloat(rows[0].balance) || 0;
+        const rawBalance = parseFloat(rows[0].balance) || 0;
+        const balance = Math.max(0, rawBalance); // Never return negative
 
         res.json({ success: true, balance: balance });
 
@@ -347,10 +352,21 @@ app.post('/api/withdraw', async (req, res) => {
         // Check balance first
         if (devMode) {
             const currentBalance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
+            if (!Number.isFinite(currentBalance)) {
+                return res.status(500).json({ success: false, message: 'Balance computation error' });
+            }
             if (amount > currentBalance) return res.status(400).json({ success: false, message: 'Insufficient balance' });
+            if ((currentBalance - Number(amount)) < MIN_BALANCE) {
+                return res.status(400).json({ success: false, message: `Minimum balance rule prevents going below Rs. ${MIN_BALANCE}` });
+            }
             const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
             inMemory.bank.push({ pin, date, type: 'Withdrawal', amount });
             const balance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
+            if ((Number(balance)) < MIN_BALANCE) {
+                // Rollback last entry if somehow fell below min balance
+                inMemory.bank.pop();
+                return res.status(400).json({ success: false, message: `Minimum balance rule prevents going below Rs. ${MIN_BALANCE}` });
+            }
             return res.json({ success: true, message: `Successfully withdrawn Rs. ${amount}`, balance });
         }
 
@@ -368,6 +384,13 @@ app.post('/api/withdraw', async (req, res) => {
             });
         }
 
+        if ((currentBalance - Number(amount)) < MIN_BALANCE) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Minimum balance rule prevents going below Rs. ${MIN_BALANCE}` 
+            });
+        }
+
         const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
         await pool.query(
@@ -381,10 +404,17 @@ app.post('/api/withdraw', async (req, res) => {
             [pin]
         );
 
+        const newBalance = Number(rows[0].balance) || 0;
+        if (newBalance < MIN_BALANCE) {
+            // If constraint violated post-insert, roll back this withdrawal
+            await pool.query('DELETE FROM bank WHERE pin = ? AND date = ? AND type = ? AND amount = ? LIMIT 1', [pin, date, 'Withdrawal', amount]);
+            return res.status(400).json({ success: false, message: `Minimum balance rule prevents going below Rs. ${MIN_BALANCE}` });
+        }
+
         res.json({
             success: true,
             message: `Successfully withdrawn Rs. ${amount}`,
-            balance: Number(rows[0].balance) || 0
+            balance: newBalance
         });
     } catch (error) {
         console.error('Withdraw error:', error);

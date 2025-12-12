@@ -106,6 +106,8 @@ async function login() {
 
     if (result.success) {
         currentUser = result.user;
+        // Ensure balance is non-negative
+        currentUser.balance = Math.max(0, Number(currentUser.balance) || 0);
         showStatus(statusDiv, 'Login Successful! Redirecting...', 'success');
         
         setTimeout(() => {
@@ -705,8 +707,8 @@ async function showBalance() {
     const result = await apiRequest(`/balance/${currentUser.pin}`);
     
     if (result.success) {
-        // Ensure balance is a number
-        currentUser.balance = Number(result.balance) || 0;
+        // Ensure balance is a non-negative number
+        currentUser.balance = Math.max(0, Number(result.balance) || 0);
         document.getElementById('balanceAmount').textContent = currentUser.balance.toFixed(2);
         showPage('balancePage');
         
