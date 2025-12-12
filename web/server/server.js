@@ -118,11 +118,11 @@ app.post('/api/login', async (req, res) => {
 
         // Get balance from bank table
         const [bankData] = await pool.query(
-            'SELECT SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END) as balance FROM bank WHERE pin = ?',
+            'SELECT COALESCE(SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END), 0) as balance FROM bank WHERE pin = ?',
             [pin]
         );
 
-        const balance = bankData[0].balance || 0;
+        const balance = Number(bankData[0].balance) || 0;
 
         res.json({
             success: true,
@@ -266,15 +266,15 @@ app.get('/api/balance/:pin', async (req, res) => {
     try {
         if (devMode) {
             const balance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
-            return res.json({ success: true, balance: balance || 0 });
+            return res.json({ success: true, balance: Number(balance) || 0 });
         }
 
         const [rows] = await pool.query(
-            'SELECT SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END) as balance FROM bank WHERE pin = ?',
+            'SELECT COALESCE(SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END), 0) as balance FROM bank WHERE pin = ?',
             [pin]
         );
 
-        const balance = rows[0].balance || 0;
+        const balance = parseFloat(rows[0].balance) || 0;
 
         res.json({ success: true, balance: balance });
 
@@ -314,14 +314,14 @@ app.post('/api/deposit', async (req, res) => {
 
         // Get updated balance
         const [rows] = await pool.query(
-            'SELECT SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END) as balance FROM bank WHERE pin = ?',
+            'SELECT COALESCE(SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END), 0) as balance FROM bank WHERE pin = ?',
             [pin]
         );
 
         res.json({
             success: true,
             message: `Successfully deposited Rs. ${amount}`,
-            balance: rows[0].balance || 0
+            balance: Number(rows[0].balance) || 0
         });
     } catch (error) {
         console.error('Deposit error:', error);
@@ -349,17 +349,17 @@ app.post('/api/withdraw', async (req, res) => {
             const currentBalance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
             if (amount > currentBalance) return res.status(400).json({ success: false, message: 'Insufficient balance' });
             const date = new Date().toISOString().slice(0, 19).replace('T', ' ');
-            inMemory.bank.push({ pin, date, type: 'Withdrawl', amount });
+            inMemory.bank.push({ pin, date, type: 'Withdrawal', amount });
             const balance = inMemory.bank.filter(t => t.pin === pin).reduce((acc, t) => acc + (t.type === 'Deposit' ? Number(t.amount) : -Number(t.amount)), 0);
             return res.json({ success: true, message: `Successfully withdrawn Rs. ${amount}`, balance });
         }
 
         const [balanceRows] = await pool.query(
-            'SELECT SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END) as balance FROM bank WHERE pin = ?',
+            'SELECT COALESCE(SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END), 0) as balance FROM bank WHERE pin = ?',
             [pin]
         );
 
-        const currentBalance = balanceRows[0].balance || 0;
+        const currentBalance = Number(balanceRows[0].balance) || 0;
 
         if (amount > currentBalance) {
             return res.status(400).json({ 
@@ -372,19 +372,19 @@ app.post('/api/withdraw', async (req, res) => {
 
         await pool.query(
             'INSERT INTO bank (pin, date, type, amount) VALUES (?, ?, ?, ?)',
-            [pin, date, 'Withdrawl', amount]
+            [pin, date, 'Withdrawal', amount]
         );
 
         // Get updated balance
         const [rows] = await pool.query(
-            'SELECT SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END) as balance FROM bank WHERE pin = ?',
+            'SELECT COALESCE(SUM(CASE WHEN type = "Deposit" THEN CAST(amount AS DECIMAL(10,2)) ELSE -CAST(amount AS DECIMAL(10,2)) END), 0) as balance FROM bank WHERE pin = ?',
             [pin]
         );
 
         res.json({
             success: true,
             message: `Successfully withdrawn Rs. ${amount}`,
-            balance: rows[0].balance || 0
+            balance: Number(rows[0].balance) || 0
         });
     } catch (error) {
         console.error('Withdraw error:', error);
